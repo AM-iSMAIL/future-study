@@ -195,7 +195,7 @@ export default function TeacherSetup({ onNext, onClassData }) {
             style={{ fontFamily: 'var(--font-display)' }}
           >
             Create Your{' '}
-            <span className="bg-gradient-to-r from-accent-400 to-cyber-purple bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-accent-400 via-cyber-purple to-cyber-pink bg-clip-text text-transparent">
               Session
             </span>
           </h1>
@@ -222,7 +222,7 @@ export default function TeacherSetup({ onNext, onClassData }) {
                     "Model Evaluation"
                   ]);
                 }}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-accent-500/10 border border-accent-500/25 hover:bg-accent-500/20 text-accent-300 transition-all duration-200 cursor-pointer flex items-center gap-1.5 border-none"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-accent-500/10 border border-accent-500/25 hover:bg-accent-500/20 text-accent-300 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
               >
                 <Sparkles size={13} className="text-accent-400" />
                 Load Demo
@@ -231,8 +231,8 @@ export default function TeacherSetup({ onNext, onClassData }) {
 
             {/* Session Title */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-                <GraduationCap size={14} className="text-accent-400" />
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2 font-display">
+                <GraduationCap size={15} className="text-accent-400" />
                 Session Title
               </label>
               <input
@@ -247,14 +247,14 @@ export default function TeacherSetup({ onNext, onClassData }) {
 
             {/* 6 Topic Inputs */}
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-                <BookOpen size={14} className="text-cyber-purple" />
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3 font-display">
+                <BookOpen size={15} className="text-cyber-purple" />
                 Topics (6 required)
               </label>
               <div className="space-y-2.5">
                 {topics.map((topic, idx) => (
                   <div key={idx} className="flex items-center gap-2.5">
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold bg-navy-700 text-slate-400 shrink-0">
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-navy-800 border border-white/5 text-slate-400 shrink-0 select-none">
                       {idx + 1}
                     </span>
                     <input

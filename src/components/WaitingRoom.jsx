@@ -15,7 +15,7 @@ const FAKE_STUDENTS = [
   { name: 'Alex Chen', id: 'STU-2024-0073' },
 ];
 
-const TOTAL_SECONDS = 5 * 60; // 5 minutes
+const TOTAL_SECONDS = 15; // 15 seconds
 
 export default function WaitingRoom({ onNext, classData, studentInfo, onSessionLock, elevenLabsApiKey }) {
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
@@ -57,28 +57,29 @@ export default function WaitingRoom({ onNext, classData, studentInfo, onSessionL
 
   // Lock session when timer hits 0
   useEffect(() => {
-    if (secondsLeft !== 0 || locked) return;
-
-    const lockTimer = setTimeout(() => {
+    if (secondsLeft === 0 && !locked) {
       setLocked(true);
       onSessionLock();
+    }
+  }, [secondsLeft, locked, onSessionLock]);
 
-      // Transition to classroom after 3 seconds
-      transitionTimerRef.current = setTimeout(() => {
-        setTransitioning(true);
-      }, 500);
+  // Handle transition sequence when locked
+  useEffect(() => {
+    if (!locked) return;
 
-      nextTimerRef.current = setTimeout(() => {
-        onNext();
-      }, 3000);
-    }, 0);
+    const transitionTimer = setTimeout(() => {
+      setTransitioning(true);
+    }, 500);
+
+    const nextTimer = setTimeout(() => {
+      onNext();
+    }, 3000);
 
     return () => {
-      clearTimeout(lockTimer);
-      clearTimeout(transitionTimerRef.current);
-      clearTimeout(nextTimerRef.current);
+      clearTimeout(transitionTimer);
+      clearTimeout(nextTimer);
     };
-  }, [secondsLeft, locked, onSessionLock, onNext]);
+  }, [locked, onNext]);
 
   // Format time
   const minutes = Math.floor(secondsLeft / 60);

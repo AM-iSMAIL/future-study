@@ -7,6 +7,10 @@ const hasFirebaseKeys = !!(
   import.meta.env.VITE_FIREBASE_PROJECT_ID
 );
 
+console.log("hasFirebaseKeys status:", hasFirebaseKeys);
+console.log("API Key loaded:", import.meta.env.VITE_FIREBASE_API_KEY ? import.meta.env.VITE_FIREBASE_API_KEY.substring(0, 10) + "..." : "undefined");
+console.log("Project ID loaded:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
+
 let authInstance = null;
 let googleProviderInstance = null;
 let isMock = false;

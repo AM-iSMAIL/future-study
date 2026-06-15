@@ -1,11 +1,12 @@
 import {
-  ChevronRight,
   Zap,
   GraduationCap,
   BookOpen,
   Trophy,
   BarChart3,
   Users,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 
 const SCREENS = [
@@ -18,6 +19,7 @@ const SCREENS = [
 ];
 
 const SCREEN_LABELS = {
+  'home': 'Home',
   'teacher-setup': 'Teacher Setup',
   'student-join': 'Student Join',
   'waiting-room': 'Waiting Room',
@@ -26,8 +28,19 @@ const SCREEN_LABELS = {
   'results': 'Session Results'
 };
 
-export default function Navbar({ currentScreen, onNavigate, studentInfo, strikeCount, classData }) {
+export default function Navbar({
+  currentScreen,
+  onNavigate,
+  studentInfo,
+  strikeCount,
+  classData,
+  user,
+  onLogout,
+  onLogin,
+}) {
   const currentIndex = SCREENS.findIndex((s) => s.id === currentScreen);
+  const CurrentIcon = SCREENS[currentIndex]?.icon || Zap;
+  const currentLabel = SCREENS[currentIndex]?.label || 'Setup';
 
   return (
     <nav className="sticky top-0 z-50 glass border-b border-white/5">
@@ -35,69 +48,32 @@ export default function Navbar({ currentScreen, onNavigate, studentInfo, strikeC
         <div className="flex items-center justify-between h-16">
           {/* Logo & Screen Badge */}
           <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => onNavigate('home')}
+              className="flex items-center gap-2.5 cursor-pointer bg-transparent border-none text-left p-0"
+            >
               <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-gradient-to-br from-accent-500 to-cyber-purple glow-accent">
                 <GraduationCap size={20} className="text-white" />
               </div>
-              <span
-                className="text-lg font-bold tracking-tight text-white"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
-                Class<span className="text-accent-400">AI</span>
+              <span className="text-lg font-bold tracking-tight text-white font-display">
+                ClassAI
               </span>
-            </div>
-            <div className="h-4 w-px bg-white/10 hidden sm:block" />
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 uppercase tracking-wider font-mono hidden sm:inline-block select-none">
-              {SCREEN_LABELS[currentScreen] || currentScreen}
-            </span>
+            </button>
+            {currentScreen !== 'home' && (
+              <>
+                <div className="h-4 w-px bg-white/10" />
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 uppercase tracking-wider font-mono select-none">
+                  {SCREEN_LABELS[currentScreen] || currentScreen}
+                </span>
+              </>
+            )}
           </div>
 
-          {/* Screen Steps */}
-          <div className="hidden lg:flex items-center gap-1">
-            {SCREENS.map((screen, idx) => {
-              const Icon = screen.icon;
-              const isActive = screen.id === currentScreen;
-              const isPast = idx < currentIndex;
-
-              return (
-                <button
-                  key={screen.id}
-                  onClick={() => onNavigate(screen.id)}
-                  className={`
-                    group flex items-center gap-1.5 px-3 py-1.5 rounded-lg
-                    text-xs font-medium transition-all duration-300 cursor-pointer
-                    border-none
-                    ${
-                      isActive
-                        ? 'bg-accent-500/20 text-accent-300 glow-accent'
-                        : isPast
-                        ? 'text-accent-400/60 hover:text-accent-300 hover:bg-white/5'
-                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                    }
-                  `}
-                >
-                  <Icon
-                    size={14}
-                    className={`transition-all duration-300 ${
-                      isActive ? 'text-accent-400' : ''
-                    }`}
-                  />
-                  <span>{screen.label}</span>
-                  {idx < SCREENS.length - 1 && (
-                    <ChevronRight
-                      size={12}
-                      className="ml-1 text-navy-600 group-last:hidden"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right Section: Session Code & Student Status */}
-          <div className="flex items-center gap-3">
+          {/* Right Section: Session Code, Student Status, and Step Indicator */}
+          <div className="flex items-center gap-4">
             {/* Active Session Code */}
-            {classData?.sessionCode && (
+            {classData?.sessionCode && currentScreen !== 'home' && (
               <div className="flex items-center gap-1.5 bg-accent-500/10 border border-accent-500/20 px-3 py-1.5 rounded-lg text-xs font-bold text-accent-300 font-mono tracking-wider select-all">
                 <span className="text-slate-500 text-[10px] uppercase font-sans font-normal hidden sm:inline">Code:</span>
                 {classData.sessionCode}
@@ -105,7 +81,7 @@ export default function Navbar({ currentScreen, onNavigate, studentInfo, strikeC
             )}
 
             {/* Student Status Badge */}
-            {studentInfo && (
+            {studentInfo && currentScreen !== 'home' && (
               <div className="hidden sm:flex items-center gap-2.5 bg-navy-950 border border-white/5 px-3.5 py-1.5 rounded-full shadow-inner animate-fade-in select-none">
                 {studentInfo.photoURL ? (
                   <img 
@@ -129,34 +105,71 @@ export default function Navbar({ currentScreen, onNavigate, studentInfo, strikeC
                 </span>
               </div>
             )}
-          </div>
 
-          {/* Mobile current screen indicator */}
-          <div className="lg:hidden flex items-center gap-2 text-sm text-accent-300">
-            {(() => {
-              const Icon =
-                SCREENS.find((s) => s.id === currentScreen)?.icon || Zap;
-              return <Icon size={16} />;
-            })()}
-            <span className="font-medium">
-              {SCREENS.find((s) => s.id === currentScreen)?.label}
-            </span>
-            <span className="text-navy-500 text-xs">
-              ({currentIndex + 1}/{SCREENS.length})
-            </span>
+            {/* Step Indicator vs Authentication Controls */}
+            {currentScreen === 'home' ? (
+              user ? (
+                <div className="flex items-center gap-3 bg-navy-950/60 border border-white/5 px-3 py-1.5 rounded-xl shadow-inner animate-fade-in select-none">
+                  {user.photoURL ? (
+                    <img 
+                      src={user.photoURL} 
+                      alt={user.displayName} 
+                      className="w-6 h-6 rounded-full object-cover border border-white/15"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-accent-500/20 flex items-center justify-center font-bold text-accent-400 text-xs">
+                      {user.displayName?.charAt(0) || 'T'}
+                    </div>
+                  )}
+                  <span className="text-xs font-semibold text-slate-300 font-display hidden sm:inline">
+                    {user.displayName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="p-1 rounded-md text-slate-400 hover:text-white bg-transparent border-none cursor-pointer hover:bg-white/5 transition-all"
+                    title="Sign Out"
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-white text-navy-950 hover:bg-slate-100 transition-all cursor-pointer border-none shadow-sm"
+                >
+                  <LogIn size={13} />
+                  <span>Sign In</span>
+                </button>
+              )
+            ) : (
+              /* Dynamic Step indicator matching screenshot */
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-accent-300 font-display select-none">
+                <CurrentIcon size={16} className="text-accent-400" />
+                <span className="font-semibold text-accent-400">
+                  {currentLabel}
+                </span>
+                <span className="text-slate-500 font-normal">
+                  ({currentIndex + 1}/{SCREENS.length})
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="h-0.5 bg-navy-800">
-        <div
-          className="h-full bg-gradient-to-r from-accent-500 to-cyber-purple transition-all duration-700 ease-out progress-bar-glow"
-          style={{
-            width: `${((currentIndex + 1) / SCREENS.length) * 100}%`,
-          }}
-        />
-      </div>
+      {currentScreen !== 'home' && (
+        <div className="h-0.5 bg-navy-800">
+          <div
+            className="h-full bg-gradient-to-r from-accent-500 to-cyber-purple transition-all duration-700 ease-out progress-bar-glow"
+            style={{
+              width: `${((currentIndex + 1) / SCREENS.length) * 100}%`,
+            }}
+          />
+        </div>
+      )}
     </nav>
   );
 }
