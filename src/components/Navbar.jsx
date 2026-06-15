@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   ChevronRight,
   Zap,
@@ -108,7 +107,15 @@ export default function Navbar({ currentScreen, onNavigate, studentInfo, strikeC
             {/* Student Status Badge */}
             {studentInfo && (
               <div className="hidden sm:flex items-center gap-2.5 bg-navy-950 border border-white/5 px-3.5 py-1.5 rounded-full shadow-inner animate-fade-in select-none">
-                <div className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-pulse" />
+                {studentInfo.photoURL ? (
+                  <img 
+                    src={studentInfo.photoURL} 
+                    alt={studentInfo.fullName} 
+                    className="w-5 h-5 rounded-full object-cover border border-white/10 shrink-0"
+                  />
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyber-green animate-pulse" />
+                )}
                 <span className="text-[11px] font-semibold text-slate-300 font-display">
                   {studentInfo.fullName}
                 </span>

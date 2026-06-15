@@ -10,7 +10,6 @@ import {
   Eye,
   Share2,
   GraduationCap,
-  Hash,
 } from 'lucide-react';
 
 export default function TeacherSetup({ onNext, onClassData }) {

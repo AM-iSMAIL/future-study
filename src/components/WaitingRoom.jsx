@@ -22,6 +22,8 @@ export default function WaitingRoom({ onNext, classData, studentInfo, onSessionL
   const [locked, setLocked] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const timerRef = useRef(null);
+  const transitionTimerRef = useRef(null);
+  const nextTimerRef = useRef(null);
 
   // Build student list: current student + 2 fake students
   const studentList = [
@@ -48,19 +50,27 @@ export default function WaitingRoom({ onNext, classData, studentInfo, onSessionL
 
   // Lock session when timer hits 0
   useEffect(() => {
-    if (secondsLeft === 0 && !locked) {
+    if (secondsLeft !== 0 || locked) return;
+
+    const lockTimer = setTimeout(() => {
       setLocked(true);
       onSessionLock();
 
       // Transition to classroom after 3 seconds
-      setTimeout(() => {
+      transitionTimerRef.current = setTimeout(() => {
         setTransitioning(true);
       }, 500);
 
-      setTimeout(() => {
+      nextTimerRef.current = setTimeout(() => {
         onNext();
       }, 3000);
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(lockTimer);
+      clearTimeout(transitionTimerRef.current);
+      clearTimeout(nextTimerRef.current);
+    };
   }, [secondsLeft, locked, onSessionLock, onNext]);
 
   // Format time

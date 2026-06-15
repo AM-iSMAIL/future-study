@@ -5,16 +5,12 @@ import {
   XCircle,
   Flame,
   RotateCcw,
-  Sparkles,
   BarChart3,
   Award,
-  BookOpen,
 } from 'lucide-react';
 
 export default function Results({
   classData,
-  quizResults,
-  strikeCount = 0,
   sessionTokens = [],
   onRestart,
 }) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Play,
   Pause,
@@ -96,13 +96,13 @@ export default function Classroom({
   unsplashClientId,
   onSaveUnsplashClientId,
   currentTopicIndex = 0,
+  onExplanationReady,
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paragraphs, setParagraphs] = useState([]);
   
-  // Keywords & Unsplash Image state
-  const [keywords, setKeywords] = useState([]);
+  // Unsplash image state
   const [unsplashImages, setUnsplashImages] = useState([null, null]);
   const [unsplashLoading, setUnsplashLoading] = useState(false);
   
@@ -129,10 +129,25 @@ export default function Classroom({
 
   const topicName = classData?.topics?.[currentTopicIndex] || 'Selected Topic';
   const totalTopics = classData?.topics?.length || 6;
+  const keywords = useMemo(() => extractKeywords(topicName), [topicName]);
+
+  const handleTopicComplete = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setTopicComplete(true);
+    setIsPlaying(false);
+  }, []);
 
   // 1. Fetch lecture content from Gemini or use fallback
   useEffect(() => {
     let active = true;
+
+    const commitParagraphs = (nextParagraphs) => {
+      if (!active) return;
+      setParagraphs(nextParagraphs);
+      onExplanationReady?.(currentTopicIndex, nextParagraphs);
+      setLoading(false);
+    };
+
     const fetchContent = async (canRetry = true) => {
       setLoading(true);
       setError(null);
@@ -142,8 +157,7 @@ export default function Classroom({
       if (!apiKey) {
         setTimeout(() => {
           if (active) {
-            setParagraphs(getFallbackLecture(topicName));
-            setLoading(false);
+            commitParagraphs(getFallbackLecture(topicName));
           }
         }, 1200);
         return;
@@ -186,8 +200,7 @@ export default function Classroom({
 
         if (active) {
           const parsed = parseParagraphs(text);
-          setParagraphs(parsed);
-          setLoading(false);
+          commitParagraphs(parsed);
         }
       } catch (err) {
         console.error("Gemini load failed:", err);
@@ -201,8 +214,7 @@ export default function Classroom({
         } else {
           if (active) {
             setError(err.message || "Failed to contact Gemini API.");
-            setParagraphs(getFallbackLecture(topicName));
-            setLoading(false);
+            commitParagraphs(getFallbackLecture(topicName));
           }
         }
       }
@@ -214,13 +226,10 @@ export default function Classroom({
       active = false;
       window.speechSynthesis?.cancel();
     };
-  }, [currentTopicIndex, apiKey, topicName]);
+  }, [currentTopicIndex, apiKey, topicName, onExplanationReady]);
 
   // 2. Extract keywords and fetch images from Unsplash on start of topic
   useEffect(() => {
-    const extracted = extractKeywords(topicName);
-    setKeywords(extracted);
-    
     let active = true;
     const fetchImages = async () => {
       setUnsplashLoading(true);
@@ -236,7 +245,7 @@ export default function Classroom({
       
       // Parallel fetches for both extracted keywords
       await Promise.all(
-        extracted.map(async (keyword, idx) => {
+        keywords.map(async (keyword, idx) => {
           try {
             const res = await fetch(
               `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
@@ -268,20 +277,20 @@ export default function Classroom({
     return () => {
       active = false;
     };
-  }, [topicName, unsplashClientId]);
+  }, [keywords, unsplashClientId]);
 
   // 3. Count down current topic duration timer
   useEffect(() => {
     if (loading || topicComplete) return;
     if (timeLeft <= 0) {
-      handleTopicComplete();
-      return;
+      const completeTimer = setTimeout(handleTopicComplete, 0);
+      return () => clearTimeout(completeTimer);
     }
     const timer = setInterval(() => {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, loading, topicComplete]);
+  }, [timeLeft, loading, topicComplete, handleTopicComplete]);
 
   // 4. Count down auto-transition after teaching completes
   useEffect(() => {
@@ -388,12 +397,6 @@ export default function Classroom({
 
   const handleReplayParagraph = () => {
     speakParagraph(currentParagraphIndex);
-  };
-
-  const handleTopicComplete = () => {
-    window.speechSynthesis?.cancel();
-    setTopicComplete(true);
-    setIsPlaying(false);
   };
 
   // Helper formatting for class timer MM:SS
@@ -693,11 +696,21 @@ export default function Classroom({
                   Topic Complete!
                 </h1>
                 <p className="text-slate-500 text-sm max-w-sm mb-6 leading-relaxed">
-                  Excellent work listening to this topic. Transitioning to evaluation quiz dynamically.
+                  Excellent work listening to this topic. The next quiz will use the explanation you just reviewed.
                 </p>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 font-mono">
-                  <Clock size={14} className="text-accent-500 animate-spin" />
-                  SWITCHING IN {transitionCountdown} SECONDS...
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onNext}
+                    className="btn-primary flex items-center justify-center gap-2 text-sm !px-6 !py-2.5"
+                  >
+                    Start Quiz
+                    <ChevronRight size={15} />
+                  </button>
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600 font-mono">
+                    <Clock size={14} className="text-accent-500 animate-spin" />
+                    AUTO START IN {transitionCountdown}S
+                  </div>
                 </div>
               </div>
             ) : !startedTeaching ? (
@@ -726,6 +739,12 @@ export default function Classroom({
                   <p className="text-[10px] text-warning flex items-center gap-1 mt-4">
                     <AlertTriangle size={10} />
                     Running in offline mode. Setup Gemini Key in header for live API responses.
+                  </p>
+                )}
+                {error && (
+                  <p className="text-[10px] text-warning flex items-center gap-1 mt-2">
+                    <AlertTriangle size={10} />
+                    Live lesson failed, so offline teaching content was loaded.
                   </p>
                 )}
               </div>

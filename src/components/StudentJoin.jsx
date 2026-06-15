@@ -52,6 +52,7 @@ export default function StudentJoin({
     onStudentJoin({
       fullName: fullName.trim(),
       studentId: studentId.trim(),
+      photoURL: null,
     });
     onNext();
   };

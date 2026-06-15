@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState } from 'react';
 import Navbar from './components/Navbar';
 import TeacherSetup from './components/TeacherSetup';
 import StudentJoin from './components/StudentJoin';
@@ -42,8 +42,16 @@ function App() {
     total: 0,
     answers: []
   });
+  const [topicExplanations, setTopicExplanations] = useState({});
 
   const navigate = (screen) => setCurrentScreen(screen);
+
+  const handleTopicExplanationReady = useCallback((topicIndex, paragraphs) => {
+    setTopicExplanations((prev) => ({
+      ...prev,
+      [topicIndex]: paragraphs,
+    }));
+  }, []);
 
   const handleStudentJoin = (info) => {
     const token = info.studentId + '_' + Date.now();
@@ -169,6 +177,7 @@ function App() {
       total: 0,
       answers: []
     });
+    setTopicExplanations({});
   };
 
   const renderScreen = () => {
@@ -217,14 +226,15 @@ function App() {
             unsplashClientId={unsplashClientId}
             onSaveUnsplashClientId={handleSaveUnsplashClientId}
             onNext={() => navigate('quiz')}
+            onExplanationReady={handleTopicExplanationReady}
           />
         );
       case 'quiz':
         return (
           <Quiz
             key={currentTopicIndex}
-            currentTopicIndex={currentTopicIndex}
             topicName={classData?.topics?.[currentTopicIndex] || 'Selected Topic'}
+            lessonParagraphs={topicExplanations[currentTopicIndex]}
             apiKey={apiKey}
             onNext={handleQuizNext}
             onQuizResults={handleQuizResults}
