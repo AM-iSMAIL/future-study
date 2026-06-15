@@ -36,6 +36,7 @@ function App() {
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('classai_gemini_api_key') || '');
   const [unsplashClientId, setUnsplashClientId] = useState(() => localStorage.getItem('classai_unsplash_client_id') || '');
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState(() => localStorage.getItem('classai_elevenlabs_api_key') || '');
   const [strikeCount, setStrikeCount] = useState(0);
   const [accumulatedQuizResults, setAccumulatedQuizResults] = useState({
     score: 0,
@@ -83,6 +84,11 @@ function App() {
   const handleSaveUnsplashClientId = (newId) => {
     setUnsplashClientId(newId);
     localStorage.setItem('classai_unsplash_client_id', newId);
+  };
+
+  const handleSaveElevenLabsApiKey = (newKey) => {
+    setElevenLabsApiKey(newKey);
+    localStorage.setItem('classai_elevenlabs_api_key', newKey);
   };
 
   const handleQuizResults = (results) => {
@@ -213,6 +219,7 @@ function App() {
             classData={classData}
             studentInfo={studentInfo}
             onSessionLock={() => setSessionLocked(true)}
+            elevenLabsApiKey={elevenLabsApiKey}
           />
         );
       case 'classroom':
@@ -225,6 +232,8 @@ function App() {
             onSaveApiKey={handleSaveApiKey}
             unsplashClientId={unsplashClientId}
             onSaveUnsplashClientId={handleSaveUnsplashClientId}
+            elevenLabsApiKey={elevenLabsApiKey}
+            onSaveElevenLabsApiKey={handleSaveElevenLabsApiKey}
             onNext={() => navigate('quiz')}
             onExplanationReady={handleTopicExplanationReady}
           />

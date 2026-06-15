@@ -95,6 +95,8 @@ export default function Classroom({
   onSaveApiKey,
   unsplashClientId,
   onSaveUnsplashClientId,
+  elevenLabsApiKey,
+  onSaveElevenLabsApiKey,
   currentTopicIndex = 0,
   onExplanationReady,
 }) {
@@ -119,6 +121,7 @@ export default function Classroom({
   const [showKeyPanel, setShowKeyPanel] = useState(false);
   const [keyInput, setKeyInput] = useState(apiKey || '');
   const [unsplashInput, setUnsplashInput] = useState(unsplashClientId || '');
+  const [elevenLabsInput, setElevenLabsInput] = useState(elevenLabsApiKey || '');
   const [settingsSaved, setSettingsSaved] = useState(false);
   
   // Topic transition sequence
@@ -126,13 +129,22 @@ export default function Classroom({
   const [transitionCountdown, setTransitionCountdown] = useState(3);
   
   const utteranceRef = useRef(null);
+  const audioRef = useRef(null);
 
   const topicName = classData?.topics?.[currentTopicIndex] || 'Selected Topic';
   const totalTopics = classData?.topics?.length || 6;
   const keywords = useMemo(() => extractKeywords(topicName), [topicName]);
 
   const handleTopicComplete = useCallback(() => {
-    window.speechSynthesis?.cancel();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     setTopicComplete(true);
     setIsPlaying(false);
   }, []);
@@ -224,7 +236,15 @@ export default function Classroom({
 
     return () => {
       active = false;
-      window.speechSynthesis?.cancel();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (audioRef.current) {
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, [currentTopicIndex, apiKey, topicName, onExplanationReady]);
 
@@ -306,23 +326,8 @@ export default function Classroom({
   }, [topicComplete, transitionCountdown, onNext]);
 
   // 5. TTS speech controls
-  const speakParagraph = (index) => {
+  const fallbackSpeakParagraph = (index) => {
     if (!window.speechSynthesis) return;
-    
-    // Cancel any active speech
-    window.speechSynthesis.cancel();
-
-    if (index >= paragraphs.length) {
-      // Completed all paragraphs for this topic
-      handleTopicComplete();
-      return;
-    }
-
-    setCurrentParagraphIndex(index);
-    setStartedTeaching(true);
-    setIsPlaying(true);
-
-    if (isMuted) return; // Speech is synthesized, but muted locally
 
     const utterance = new SpeechSynthesisUtterance(paragraphs[index]);
     utteranceRef.current = utterance;
@@ -354,18 +359,99 @@ export default function Classroom({
     window.speechSynthesis.speak(utterance);
   };
 
-  const handlePlayPause = () => {
-    if (!window.speechSynthesis) return;
+  const speakParagraph = async (index) => {
+    // Cancel any active native speech
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
 
-    if (isPlaying) {
-      window.speechSynthesis.pause();
-      setIsPlaying(false);
+    // Pause and clean up any active ElevenLabs audio
+    if (audioRef.current) {
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    if (index >= paragraphs.length) {
+      // Completed all paragraphs for this topic
+      handleTopicComplete();
+      return;
+    }
+
+    setCurrentParagraphIndex(index);
+    setStartedTeaching(true);
+    setIsPlaying(true);
+
+    if (isMuted) return; // Speech is generated/played, but muted locally
+
+    if (elevenLabsApiKey) {
+      try {
+        const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+          method: 'POST',
+          headers: {
+            'xi-api-key': elevenLabsApiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: paragraphs[index],
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`ElevenLabs API returned status ${response.status}`);
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          speakParagraph(index + 1);
+        };
+
+        audio.onerror = (e) => {
+          console.warn("ElevenLabs audio playback error, skipping to next paragraph:", e);
+          setTimeout(() => {
+            speakParagraph(index + 1);
+          }, 3000);
+        };
+
+        await audio.play();
+      } catch (err) {
+        console.warn("ElevenLabs voice generation failed, falling back to browser speechSynthesis:", err);
+        fallbackSpeakParagraph(index);
+      }
     } else {
+      fallbackSpeakParagraph(index);
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.pause();
+      }
+    } else {
+      setIsPlaying(true);
       if (!startedTeaching) {
         speakParagraph(currentParagraphIndex);
       } else {
-        window.speechSynthesis.resume();
-        setIsPlaying(true);
+        if (audioRef.current) {
+          audioRef.current.play().catch(err => {
+            console.error("Audio play failed on resume:", err);
+          });
+        }
+        if (window.speechSynthesis) {
+          window.speechSynthesis.resume();
+        }
       }
     }
   };
@@ -374,7 +460,12 @@ export default function Classroom({
     const nextMute = !isMuted;
     setIsMuted(nextMute);
     if (nextMute) {
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setIsPlaying(false);
     } else {
       speakParagraph(currentParagraphIndex);
@@ -410,6 +501,7 @@ export default function Classroom({
   const saveSettings = () => {
     onSaveApiKey(keyInput.trim());
     onSaveUnsplashClientId(unsplashInput.trim());
+    onSaveElevenLabsApiKey(elevenLabsInput.trim());
     setSettingsSaved(true);
     setTimeout(() => {
       setSettingsSaved(false);
@@ -600,14 +692,14 @@ export default function Classroom({
               type="button"
               onClick={() => setShowKeyPanel(!showKeyPanel)}
               className={`p-2 rounded-lg transition-all duration-300 cursor-pointer flex items-center gap-1.5 border-none text-xs font-medium ${
-                apiKey 
+                apiKey || elevenLabsApiKey
                   ? 'bg-cyber-green/10 text-cyber-green hover:bg-cyber-green/20' 
                   : 'bg-warning/10 text-warning hover:bg-warning/20'
               }`}
             >
               <Key size={14} />
               <span className="hidden sm:inline">
-                {apiKey ? 'API Connected' : 'Offline Mode (Setup Key)'}
+                {apiKey || elevenLabsApiKey ? 'APIs Connected' : 'Offline Mode (Setup Keys)'}
               </span>
             </button>
             
@@ -631,6 +723,18 @@ export default function Classroom({
                       placeholder="AIzaSy..."
                       value={keyInput}
                       onChange={(e) => setKeyInput(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase font-mono block mb-1">
+                      ElevenLabs API Key
+                    </label>
+                    <input
+                      type="password"
+                      className="input-dark !py-2 !text-xs"
+                      placeholder="ElevenLabs API Key"
+                      value={elevenLabsInput}
+                      onChange={(e) => setElevenLabsInput(e.target.value)}
                     />
                   </div>
                   <div>

@@ -17,13 +17,14 @@ const FAKE_STUDENTS = [
 
 const TOTAL_SECONDS = 5 * 60; // 5 minutes
 
-export default function WaitingRoom({ onNext, classData, studentInfo, onSessionLock }) {
+export default function WaitingRoom({ onNext, classData, studentInfo, onSessionLock, elevenLabsApiKey }) {
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
   const [locked, setLocked] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const timerRef = useRef(null);
   const transitionTimerRef = useRef(null);
   const nextTimerRef = useRef(null);
+  const testAudioRef = useRef(null);
 
   // Build student list: current student + 2 fake students
   const studentList = [
@@ -45,7 +46,13 @@ export default function WaitingRoom({ onNext, classData, studentInfo, onSessionL
       });
     }, 1000);
 
-    return () => clearInterval(timerRef.current);
+    return () => {
+      clearInterval(timerRef.current);
+      if (testAudioRef.current) {
+        testAudioRef.current.pause();
+        testAudioRef.current = null;
+      }
+    };
   }, []);
 
   // Lock session when timer hits 0
@@ -229,15 +236,58 @@ export default function WaitingRoom({ onNext, classData, studentInfo, onSessionL
               </div>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  const testText = "Welcome to ClassAI. Testing audio synthesis for the upcoming lecture. Audio is working perfectly.";
+                  
+                  // Cancel any browser speech
                   if (window.speechSynthesis) {
                     window.speechSynthesis.cancel();
-                    const text = "Welcome to ClassAI. Testing audio synthesis for the upcoming lecture. Audio is working perfectly.";
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    const voices = window.speechSynthesis.getVoices();
-                    const engVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
-                    if (engVoice) utterance.voice = engVoice;
-                    window.speechSynthesis.speak(utterance);
+                  }
+
+                  // Stop previous test audio
+                  if (testAudioRef.current) {
+                    testAudioRef.current.pause();
+                    testAudioRef.current = null;
+                  }
+
+                  if (elevenLabsApiKey) {
+                    try {
+                      const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
+                        method: 'POST',
+                        headers: {
+                          'xi-api-key': elevenLabsApiKey,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                          text: testText,
+                          model_id: 'eleven_monolingual_v1',
+                          voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+                        })
+                      });
+                      if (!response.ok) {
+                        throw new Error(`ElevenLabs status ${response.status}`);
+                      }
+                      const audioBlob = await response.blob();
+                      const audioUrl = URL.createObjectURL(audioBlob);
+                      const audio = new Audio(audioUrl);
+                      testAudioRef.current = audio;
+                      await audio.play();
+                    } catch (err) {
+                      console.warn("ElevenLabs test voice failed, falling back to browser speech:", err);
+                      fallbackSpeech(testText);
+                    }
+                  } else {
+                    fallbackSpeech(testText);
+                  }
+
+                  function fallbackSpeech(text) {
+                    if (window.speechSynthesis) {
+                      const utterance = new SpeechSynthesisUtterance(text);
+                      const voices = window.speechSynthesis.getVoices();
+                      const engVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+                      if (engVoice) utterance.voice = engVoice;
+                      window.speechSynthesis.speak(utterance);
+                    }
                   }
                 }}
                 className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-accent-500/10 hover:bg-accent-500/20 text-accent-300 border-none cursor-pointer flex items-center gap-1.5 transition-all duration-200"
